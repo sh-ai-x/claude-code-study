@@ -1,0 +1,433 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<meta name="description" content="A practical guide to the Language Server Protocol and how Claude Code plugins consume LSP servers for navigation and diagnostics.">
+<title>LSP &amp; Claude Code Plugin LSP Usage &mdash; A Practical Guide</title>
+<style>
+:root { color-scheme: light dark; --bg:#fff; --surface:#f5f5f7; --surface-2:#fbfbfd; --text:#1d1d1f; --text-2:#6e6e73; --text-3:#aeaeb2; --border:#e5e5ea; --border-strong:#d2d2d7; --accent:#0071e3; --accent-soft:rgba(0,113,227,.08); --success:#34c759; --warning:#ff9f0a; --danger:#ff3b30; --code-bg:#f5f5f7; --kbd-bg:#fff; }
+@media (prefers-color-scheme: dark) { :root { --bg:#000; --surface:#1c1c1e; --surface-2:#2c2c2e; --text:#f5f5f7; --text-2:#98989d; --text-3:#636366; --border:#38383a; --border-strong:#48484a; --accent:#0a84ff; --accent-soft:rgba(10,132,255,.18); --success:#30d158; --warning:#ff9f0a; --danger:#ff453a; --code-bg:#1c1c1e; --kbd-bg:#2c2c2e; } }
+*{ box-sizing: border-box; } html { scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } * { animation: none !important; transition: none !important; } }
+body { margin: 0; background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, system-ui, sans-serif; font-size: 15px; line-height: 1.6; -webkit-font-smoothing: antialiased; }
+a { color: var(--accent); text-decoration: none; }
+a:hover, a:focus-visible { text-decoration: underline; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+.skip-link { position: absolute; left: 0; top: 0; padding: 8px 16px; background: var(--accent); color: #fff; border-bottom-right-radius: 8px; transform: translateY(-110%); transition: transform 120ms ease; z-index: 100; }
+.skip-link:focus { transform: translateY(0); text-decoration: none; }
+header.site { border-bottom: 1px solid var(--border); background: var(--surface-2); }
+.nav { max-width: 1080px; margin: 0 auto; padding: 14px 24px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.brand { font-weight: 700; letter-spacing: -0.01em; font-size: 15px; color: var(--text); }
+.brand .dot { color: var(--accent); }
+.breadcrumb { font-size: 13px; color: var(--text-2); }
+main { max-width: 1080px; margin: 0 auto; padding: 32px 24px 64px; }
+
+.hero { padding: 8px 0 32px; border-bottom: 1px solid var(--border); margin-bottom: 32px; }
+.hero .eyebrow { display: inline-block; font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent); background: var(--accent-soft); padding: 4px 10px; border-radius: 999px; margin-bottom: 16px; }
+.hero h1 { font-size: 38px; font-weight: 700; letter-spacing: -0.02em; margin: 0 0 14px; line-height: 1.15; }
+.hero .lead { font-size: 18px; color: var(--text-2); margin: 0 0 24px; max-width: 760px; }
+.tldr { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 22px 26px; margin-bottom: 32px; }
+.tldr .label { font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent); margin-bottom: 8px; }
+.tldr h2 { margin: 0 0 10px; font-size: 22px; letter-spacing: -0.01em; border: 0; padding: 0; }
+.tldr p { margin: 0 0 12px; }
+.tldr .specs { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin: 16px 0 0; padding: 0; list-style: none; }
+.tldr .specs li { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; font-size: 13px; }
+.tldr .specs li strong { display: block; color: var(--accent); font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 2px; }
+nav.toc { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px 22px; margin: 0 0 40px; }
+nav.toc h2 { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-2); margin: 0 0 10px; border: 0; padding: 0; }
+nav.toc ol { margin: 0; padding-left: 20px; columns: 2; column-gap: 32px; }
+nav.toc li { margin: 4px 0; break-inside: avoid; }
+@media (max-width: 720px) { nav.toc ol { columns: 1; } }
+h2.section { font-size: 24px; font-weight: 600; letter-spacing: -0.01em; margin: 56px 0 12px; padding-top: 16px; border-top: 1px solid var(--border); }
+h2.section:first-of-type { border-top: 0; padding-top: 0; }
+h3 { font-size: 17px; font-weight: 600; letter-spacing: -0.005em; margin: 28px 0 8px; }
+h4 { font-size: 14px; font-weight: 600; margin: 18px 0 6px; color: var(--text); }
+p { margin: 10px 0; } ul, ol { padding-left: 22px; } li { margin: 4px 0; }
+code, kbd, samp, pre { font-family: ui-monospace, "SF Mono", Menlo, Monaco, Consolas, monospace; font-size: 0.9em; }
+code { background: var(--code-bg); border: 1px solid var(--border); padding: 1px 6px; border-radius: 4px; }
+kbd { background: var(--kbd-bg); border: 1px solid var(--border-strong); border-bottom-width: 2px; padding: 1px 6px; border-radius: 4px; font-size: 0.85em; }
+pre { background: var(--code-bg); border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; overflow-x: auto; line-height: 1.55; margin: 16px 0; }
+pre code { background: transparent; border: 0; padding: 0; font-size: 0.85em; }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; margin: 16px 0 28px; }
+.card-grid { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 18px 20px; }
+.card-grid .tag { display: inline-block; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--accent); background: var(--accent-soft); padding: 2px 8px; border-radius: 4px; margin-bottom: 8px; }
+.card-grid h3 { margin: 0 0 6px; font-size: 15px; }
+.card-grid p { font-size: 13px; color: var(--text-2); margin: 0; line-height: 1.5; }
+.callout { background: var(--accent-soft); border-left: 4px solid var(--accent); border-radius: 6px; padding: 12px 16px; margin: 16px 0; font-size: 14px; }
+.callout .label { display: block; font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--accent); margin-bottom: 4px; }
+.callout.warn { background: rgba(255, 159, 10, 0.10); border-left-color: var(--warning); }
+.callout.warn .label { color: var(--warning); }
+.callout.danger { background: rgba(255, 59, 48, 0.10); border-left-color: var(--danger); }
+.callout.danger .label { color: var(--danger); }
+.callout.success { background: rgba(52, 199, 89, 0.10); border-left-color: var(--success); }
+.callout.success .label { color: var(--success); }
+.callout p:last-child { margin-bottom: 0; }
+.table-wrap { overflow-x: auto; margin: 16px 0 24px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-2); }
+table { border-collapse: collapse; width: 100%; min-width: 520px; font-size: 14px; }
+th, td { border-bottom: 1px solid var(--border); padding: 10px 14px; text-align: left; vertical-align: top; }
+thead th { background: var(--surface); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-2); border-bottom: 1px solid var(--border-strong); }
+tbody tr:last-child td { border-bottom: 0; }
+tbody tr:hover td { background: var(--surface); }
+td code, th code { background: var(--code-bg); padding: 1px 5px; border-radius: 4px; font-size: 12px; }
+.flow { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 0; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 18px 14px; margin: 18px 0; }
+.flow .step { padding: 12px 14px; text-align: center; position: relative; }
+.flow .step + .step::before { content: ""; position: absolute; left: -1px; top: 25%; bottom: 25%; width: 0; border-left: 2px dashed var(--border-strong); }
+.flow .step .n { display: inline-block; font-size: 11px; font-weight: 700; letter-spacing: 0.06em; color: var(--accent); background: var(--accent-soft); border-radius: 999px; padding: 2px 10px; margin-bottom: 8px; }
+.flow .step .t { font-weight: 600; font-size: 14px; margin-bottom: 4px; }
+.flow .step .d { font-size: 12px; color: var(--text-2); line-height: 1.45; }
+.flow-diagram { display: grid; grid-template-columns: 1fr auto 1fr; gap: 12px; align-items: stretch; margin: 18px 0; }
+.flow-diagram > .lane { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; }
+.flow-diagram .lane h4 { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-2); margin: 0 0 8px; }
+.flow-diagram .lane ul { margin: 0; padding-left: 18px; font-size: 13px; }
+.flow-diagram .arrow { display: flex; align-items: center; justify-content: center; color: var(--text-3); font-size: 18px; font-weight: 700; }
+@media (max-width: 720px) { .flow-diagram { grid-template-columns: 1fr; } .flow-diagram .arrow { transform: rotate(90deg); } }
+.steps { counter-reset: step; list-style: none; padding: 0; margin: 12px 0 8px; }
+.steps > li { counter-increment: step; position: relative; padding: 10px 12px 10px 44px; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 8px; background: var(--surface); font-size: 14px; }
+.steps > li::before { content: counter(step); position: absolute; left: 10px; top: 10px; width: 24px; height: 24px; border-radius: 999px; background: var(--accent); color: #ffffff; font-weight: 700; font-size: 13px; display: flex; align-items: center; justify-content: center; }
+.steps > li code { font-size: 12px; }
+.prompts { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 18px 22px; margin: 16px 0; }
+.prompts h3 { margin-top: 0; font-size: 15px; }
+.prompts ul { margin: 6px 0 0; padding-left: 18px; }
+.prompts li { font-size: 13px; margin: 4px 0; }
+.prompts code { font-size: 12px; }
+.pill { display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: var(--surface); border: 1px solid var(--border); color: var(--text-2); margin-right: 6px; vertical-align: middle; }
+.pill.ok { color: var(--success); border-color: var(--success); }
+.pill.warn { color: var(--warning); border-color: var(--warning); }
+.pill.danger { color: var(--danger); border-color: var(--danger); }
+.muted { color: var(--text-2); }
+footer.site { border-top: 1px solid var(--border); padding: 24px 0 48px; margin-top: 64px; color: var(--text-2); font-size: 13px; }
+footer.site .inner { max-width: 1080px; margin: 0 auto; padding: 0 24px; }
+footer.site h2 { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; margin: 0 0 12px; border: 0; padding: 0; }
+footer.site ul { padding-left: 18px; margin: 6px 0 16px; }
+footer.site .src { font-size: 12px; color: var(--text-3); margin-top: 16px; }
+@media (max-width: 720px) { .hero h1 { font-size: 30px; } .hero .lead { font-size: 16px; } h2.section { font-size: 20px; } main { padding: 24px 16px 48px; } .nav { padding: 12px 16px; } table { font-size: 13px; } th, td { padding: 8px 10px; } }
+@media print { body { background: #ffffff; color: #000000; font-size: 12pt; } header.site, footer.site, nav.toc, .skip-link { display: none; } .card, .card-grid, .callout, pre, .table-wrap, .flow, .flow-diagram, .prompts { break-inside: avoid; border-color: #999; } a { color: #000; text-decoration: underline; } pre { background: #f5f5f5; } h2.section { page-break-before: always; } h2.section:first-of-type { page-break-before: auto; } }
+</style>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to main content</a>
+<header class="site"><div class="nav"><a class="brand" href="#top">dev-harness-kit <span class="dot">/</span> docs</a><nav class="breadcrumb" aria-label="Breadcrumb"><span>docs</span> / <span aria-current="page">lsp-guide.html</span></nav></div></header>
+<main id="main">
+<section class="hero" id="top">
+<span class="eyebrow">Reference guide</span>
+<h1>LSP &amp; Claude Code Plugin LSP Usage</h1>
+<p class="lead">A self-contained practical guide to the Language Server Protocol and how Claude Code plugins turn language servers into in-editor code intelligence. Read it once, then keep it open while wiring up <code>pyright</code> or <code>typescript-language-server</code>.</p>
+</section>
+<aside class="tldr" aria-label="TL;DR summary">
+<div class="label">At a glance</div>
+<h2>TL;DR</h2>
+<p>The Language Server Protocol (LSP) standardises how an editor (the <strong>client</strong>) talks to a long-running analysis process (the <strong>language server</strong>) over <strong>JSON-RPC</strong>. Transport usually uses stdio; a TCP socket is used when <code>transport</code> is set to <code>socket</code>. Claude Code plays the role of LSP client; each active plugin that declares an <code>lspServers</code> block supplies one or more server definitions. When Claude Code opens a file whose extension matches a registered server, it spawns the binary, negotiates capabilities, and exposes navigation (go to definition, references, hover, symbols, implementations, call hierarchy) plus optional diagnostics through its built-in LSP tool &mdash; not a slash command.</p>
+<ul class="specs" aria-label="Key facts">
+<li><strong>Transport</strong>stdio (default) or socket</li>
+<li><strong>Config root</strong>plugin <code>.lsp.json</code> or inline in <code>plugin.json</code></li>
+<li><strong>Tool surface</strong>built-in LSP tool, not <code>/lsp</code></li>
+<li><strong>Example servers</strong>Pyright + TypeScript Language Server</li>
+</ul>
+</aside>
+<nav class="toc" aria-label="Table of contents">
+<h2>On this page</h2>
+<ol>
+<li><a href="#terms">Terminology</a></li>
+<li><a href="#architecture">Architecture &amp; lifecycle</a></li>
+<li><a href="#claude-code">How Claude Code acts as an LSP client</a></li>
+<li><a href="#config">Configuration reference</a></li>
+<li><a href="#setup-ts">TypeScript / JavaScript setup</a></li>
+<li><a href="#setup-py">Python setup</a></li>
+<li><a href="#daily">Daily use</a></li>
+<li><a href="#zero">What &ldquo;0 plugin LSP servers&rdquo; means</a></li>
+<li><a href="#troubleshoot">Troubleshooting runbook</a></li>
+<li><a href="#security">Security &amp; performance</a></li>
+<li><a href="#sources">Sources</a></li>
+</ol>
+</nav>
+<section id="terms" aria-labelledby="terms-h">
+<h2 class="section" id="terms-h">1. Terminology</h2>
+<p>Before wiring anything up, lock down these terms. They are reused verbatim throughout the LSP specification and Claude Code's plugin docs.</p>
+<div class="cards">
+<article class="card-grid"><span class="tag">Protocol</span><h3>LSP</h3><p>The Language Server Protocol: a JSON-RPC 2.0 contract between an editor and a language-specific analysis process. Standardises requests, responses, notifications, and capability negotiation so any client can talk to any server.</p></article>
+<article class="card-grid"><span class="tag">Client</span><h3>Client (editor / host)</h3><p>The process that owns the buffer and UI: VS Code, Neovim, Helix, or in our case Claude Code. Owns the document state and decides which server to ask for which feature.</p></article>
+<article class="card-grid"><span class="tag">Server</span><h3>Language server</h3><p>A standalone long-lived process that parses code, maintains project state, and answers LSP requests. Examples: <code>pyright-langserver</code>, <code>typescript-language-server</code>, <code>gopls</code>, <code>rust-analyzer</code>.</p></article>
+<article class="card-grid"><span class="tag">RPC</span><h3>JSON-RPC</h3><p>The wire format. Every message is a JSON object. Requests carry an <code>id</code> and expect a matching response; notifications carry no <code>id</code> and are fire-and-forget. Headers use HTTP-style <code>Content-Length</code>.</p></article>
+<article class="card-grid"><span class="tag">Handshake</span><h3>Capability negotiation</h3><p>After <code>initialize</code>, both sides exchange <code>capabilities</code>: what features they support. The intersection is what is actually available. A server that does not advertise <code>definitionProvider</code> will never answer go-to-definition.</p></article>
+<article class="card-grid"><span class="tag">Scope</span><h3>Workspace</h3><p>The set of folders the server reasons about. Servers see <code>workspace/didChangeWatchedFiles</code>, <code>workspace/symbol</code>, and cross-file queries. Per-file state is called the <em>document</em>.</p></article>
+<article class="card-grid"><span class="tag">Signal</span><h3>Diagnostics</h3><p>Server-pushed lint and type-check results, sent via <code>textDocument/publishDiagnostics</code>. Severity levels: error, warning, information, hint. Claude Code can auto-inject these into context after edits.</p></article>
+<article class="card-grid"><span class="tag">Movement</span><h3>Navigation</h3><p>The bread-and-butter features: go to definition, find references, hover/type info, document &amp; workspace symbols, go to implementation, call hierarchy. Each is gated by its own capability flag.</p></article>
+</div>
+</section>
+<section id="architecture" aria-labelledby="arch-h">
+<h2 class="section" id="arch-h">2. Architecture &amp; lifecycle</h2>
+<p>An LSP session is a long-lived JSON-RPC conversation between two processes. The client spawns the server, both sides shake hands, then exchange document and request messages until shutdown.</p>
+<h3>Topology</h3>
+<div class="flow-diagram" role="group" aria-label="LSP topology">
+<div class="lane" aria-label="Client side"><h4>Client (Claude Code)</h4><ul><li>Owns the open buffer</li><li>Tracks user prompts</li><li>Spawns server processes</li><li>Routes LSP requests to tool calls</li><li>Receives server notifications</li></ul></div>
+<div class="arrow" aria-hidden="true">&harr;</div>
+<div class="lane" aria-label="Server side"><h4>Language server</h4><ul><li>Parses source files</li><li>Maintains a project model</li><li>Answers navigation requests</li><li>Publishes diagnostics on change</li><li>No UI; no network access needed</li></ul></div>
+</div>
+<p class="muted">Frames are JSON-RPC messages with <code>Content-Length</code> headers, delimited on stdin/stdout (default) or a TCP socket when <code>transport</code> is set to <code>socket</code>.</p>
+<h3>Lifecycle phases</h3>
+<div class="flow" role="group" aria-label="LSP lifecycle">
+<div class="step"><span class="n">1</span><div class="t">initialize</div><div class="d">Client sends rootPath, capabilities, trace. Server replies with its own capabilities.</div></div>
+<div class="step"><span class="n">2</span><div class="t">initialized</div><div class="d">Client notification. Server may now start expensive work (indexing).</div></div>
+<div class="step"><span class="n">3</span><div class="t">requests &amp; notifications</div><div class="d">didOpen / didChange / didSave feed documents. Server publishes diagnostics.</div></div>
+<div class="step"><span class="n">4</span><div class="t">shutdown</div><div class="d">Client asks server to finish work. Server replies then waits.</div></div>
+<div class="step"><span class="n">5</span><div class="t">exit</div><div class="d">Client closes stdin. Server process terminates.</div></div>
+</div>
+<h3>Common message kinds</h3>
+<div class="cards">
+<article class="card-grid"><span class="tag">Request</span><h3>Client &rarr; Server</h3><p><code>textDocument/definition</code>, <code>textDocument/references</code>, <code>textDocument/hover</code>, <code>textDocument/documentSymbol</code>, <code>workspace/symbol</code>, <code>textDocument/implementation</code>, <code>textDocument/prepareCallHierarchy</code>.</p></article>
+<article class="card-grid"><span class="tag">Notification</span><h3>Client &rarr; Server</h3><p><code>textDocument/didOpen</code>, <code>textDocument/didChange</code>, <code>textDocument/didSave</code>, <code>workspace/didChangeWatchedFiles</code>. No reply expected.</p></article>
+<article class="card-grid"><span class="tag">Server notification</span><h3>Server &rarr; Client</h3><p><code>textDocument/publishDiagnostics</code>, <code>window/logMessage</code>, <code>window/showMessage</code>. The signal channel back to the UI and to Claude Code's diagnostic buffer.</p></article>
+<article class="card-grid"><span class="tag">Capability</span><h3>Intersection</h3><p>Both sides advertise what they support; the effective feature set is the intersection. No <code>definitionProvider</code> capability means no go-to-definition even if the client asks.</p></article>
+</div>
+<div class="callout"><span class="label">Why this matters for Claude Code</span><p>Claude Code does not render a UI buffer; it routes LSP features through its built-in tool. When a server advertises a feature, Claude Code can ask for it on the user's behalf &mdash; no plugin needs to re-implement parsing.</p></div>
+</section>
+<section id="claude-code" aria-labelledby="cc-h">
+<h2 class="section" id="cc-h">3. How Claude Code acts as an LSP client</h2>
+<p>Claude Code is the LSP client. It coordinates the configured language servers and uses their advertised capabilities to provide code intelligence; the actual parsing and project model live in those servers, which are contributed by plugins.</p>
+<h3>Role of the plugin</h3>
+<ul>
+<li><strong>Active plugins</strong> provide server definitions. A plugin that ships only skills or commands contributes nothing to LSP.</li>
+<li><strong>Extension mapping</strong> in each definition tells Claude Code which file extensions route to which server. First registered extension wins on collision (with a warning).</li>
+<li><strong>Lifecycle</strong>: Claude Code spawns the configured binary when it opens a matching file, negotiates capabilities, and keeps the process alive for the session.</li>
+</ul>
+<h3>What's exposed</h3>
+<div class="cards">
+<article class="card-grid"><span class="tag">Auto</span><h3>Diagnostics after edits</h3><p>After you edit a tracked file, the server publishes diagnostics. Claude Code can inject them into context automatically so the model sees fresh errors before answering.</p></article>
+<article class="card-grid"><span class="tag">Tool</span><h3>Built-in LSP tool</h3><p>Definition, references, hover, document symbols, workspace symbols, implementations, and call hierarchy flow through Claude Code's built-in LSP tool &mdash; invoked by the model, not by a slash command.</p></article>
+<article class="card-grid"><span class="tag">Visible</span><h3>Transparency</h3><p>There is no <code>/lsp</code> command. Users do not type LSP syntax. They ask Claude Code things like &ldquo;find references&rdquo; or &ldquo;what's the type of <code>x</code>?&rdquo; and the underlying tool handles it.</p></article>
+<article class="card-grid"><span class="tag">Lifecycle</span><h3>Reload</h3><p>Plugin or config changes require <code>/reload-plugins</code>. Servers restart with the new definition.</p></article>
+</div>
+<div class="callout warn"><span class="label">Not a slash command</span><p>LSP features are not exposed as <code>/lsp</code> or similar slash commands. They are invoked implicitly through Claude Code's built-in LSP tool when the model needs navigation or when the user asks a question that requires it.</p></div>
+</section>
+<section id="config" aria-labelledby="cfg-h">
+<h2 class="section" id="cfg-h">4. Configuration reference</h2>
+<p>Two equivalent ways to declare LSP servers:</p>
+<ul>
+<li><strong>Plugin-root file</strong>: <code>.lsp.json</code> at the plugin root, side-by-side with <code>.claude-plugin/plugin.json</code>.</li>
+<li><strong>Inline</strong>: an <code>lspServers</code> key inside <code>.claude-plugin/plugin.json</code>. This is what the official marketplace examples use.</li>
+</ul>
+<h3>Top-level shape</h3>
+<pre><code>{
+  "&lt;server-name&gt;": {
+    "command": "&lt;required&gt;",
+    "args": ["..."],
+    "transport": "stdio",
+    "env": { "KEY": "value" },
+    "initializationOptions": { "...": "..." },
+    "settings": { "...": "..." },
+    "extensionToLanguage": {
+      "&lt;ext&gt;": "&lt;language-id&gt;"
+    },
+    "workspaceFolder": "&lt;path&gt;",
+    "startupTimeout": 10000,
+    "shutdownTimeout": 5000,
+    "restartOnCrash": true,
+    "maxRestarts": 5,
+    "diagnostics": true
+  }
+}</code></pre>
+<h3>Field reference</h3>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Default</th><th>Purpose</th></tr></thead>
+<tbody>
+<tr><td><code>command</code> <span class="pill danger">required</span></td><td>string</td><td>&mdash;</td><td>Executable name or absolute path. Resolved through Claude Code's PATH for the spawned process; must be reachable from that PATH.</td></tr>
+<tr><td><code>args</code></td><td>string[]</td><td><code>[]</code></td><td>Arguments passed to <code>command</code>. Typical: <code>["--stdio"]</code> for stdio-served servers.</td></tr>
+<tr><td><code>transport</code></td><td>&ldquo;stdio&rdquo; | &ldquo;socket&rdquo;</td><td><code>stdio</code></td><td>Wire transport. <code>socket</code> requires the server to listen on a TCP port and Claude Code to connect.</td></tr>
+<tr><td><code>env</code></td><td>object&lt;string,string&gt;</td><td>inherits</td><td>Extra environment variables injected into the server process. Visible values; treat as disclosed.</td></tr>
+<tr><td><code>initializationOptions</code></td><td>object</td><td><code>{}</code></td><td>Forwarded verbatim to the LSP <code>initialize</code> request under <code>initializationOptions</code>.</td></tr>
+<tr><td><code>settings</code></td><td>object</td><td><code>{}</code></td><td>Forwarded via <code>workspace/didChangeConfiguration</code> after init. Use for server-specific runtime config (e.g. Pyright severities).</td></tr>
+<tr><td><code>extensionToLanguage</code> <span class="pill danger">required</span></td><td>object&lt;string,string&gt;</td><td>&mdash;</td><td>Maps file extensions (with leading dot) to LSP language identifiers. First registered extension wins on collision.</td></tr>
+<tr><td><code>workspaceFolder</code></td><td>string</td><td>project root</td><td>Override the root URI sent during <code>initialize</code>. Useful for monorepos and WSL mounts.</td></tr>
+<tr><td><code>startupTimeout</code></td><td>number (ms)</td><td>10000</td><td>How long Claude Code waits for the server to complete <code>initialize</code> before declaring it failed.</td></tr>
+<tr><td><code>shutdownTimeout</code> <span class="pill">v2.1.205+</span></td><td>number (ms)</td><td>5000</td><td>How long Claude Code waits for a clean <code>shutdown</code> reply before forcing exit.</td></tr>
+<tr><td><code>restartOnCrash</code> <span class="pill">v2.1.205+</span></td><td>boolean</td><td><code>true</code></td><td>Whether Claude Code should respawn the server after a crash, up to <code>maxRestarts</code>.</td></tr>
+<tr><td><code>maxRestarts</code></td><td>number</td><td>5</td><td>Cap on automatic restarts per session to avoid crash-loop spam.</td></tr>
+<tr><td><code>diagnostics</code></td><td>boolean</td><td><code>true</code></td><td>If <code>false</code>, navigation features stay on but Claude Code suppresses auto-injected diagnostics in the model context.</td></tr>
+</tbody>
+</table>
+</div>
+<div class="callout"><span class="label">Version note</span><p><code>restartOnCrash</code> and <code>shutdownTimeout</code> are supported in Claude Code <strong>v2.1.205</strong> and newer. On earlier builds, including either field can cause the entire server definition to be skipped at load time. Upgrade Claude Code, omit these fields, or rename the field to something the older build ignores &mdash; and re-check with <code>claude --debug</code> to see whether the definition was loaded or skipped.</p></div>
+</section>
+<section id="setup-ts" aria-labelledby="ts-h">
+<h2 class="section" id="ts-h">5. TypeScript / JavaScript setup</h2>
+<p>The official Anthropic-maintained marketplace plugin <code>typescript-lsp</code> wires up <code>typescript-language-server</code>. End-to-end, that takes four steps plus one reload.</p>
+<ol class="steps">
+<li>Install the server binary globally. Both packages are needed because the language server shells out to <code>tsc</code> for project-wide type checking:<br><code>npm install -g typescript-language-server typescript</code></li>
+<li>Install the marketplace plugin in Claude Code:<br><code>/plugin install typescript-lsp@claude-plugins-official</code></li>
+<li>Verify the binary in the same environment that launches Claude Code (not your interactive shell PATH &mdash; see the troubleshooting runbook). Ask Claude Code to run:<br><code>command -v typescript-language-server</code></li>
+<li>Reload plugin discovery:<br><code>/reload-plugins</code></li>
+</ol>
+<h3>Resulting configuration</h3>
+<p>The official marketplace entry uses the inline <code>lspServers</code> form. Reproduced verbatim from <code>marketplace.json</code>:</p>
+<pre><code>"lspServers": {
+  "typescript": {
+    "command": "typescript-language-server",
+    "args": ["--stdio"],
+    "extensionToLanguage": {
+      ".ts": "typescript",
+      ".tsx": "typescriptreact",
+      ".js": "javascript",
+      ".jsx": "javascriptreact",
+      ".mts": "typescript",
+      ".cts": "typescript",
+      ".mjs": "javascript",
+      ".cjs": "javascript"
+    }
+  }
+}</code></pre>
+<p class="muted">Source: <code>~/.claude/plugins/marketplaces/claude-plugins-official/.claude-plugin/marketplace.json</code>, lines 3412&ndash;3439.</p>
+<div class="callout success"><span class="label">Smoke test</span><p>Open any <code>.ts</code> file in a project Claude Code is operating on, then ask: &ldquo;find every reference to <code>myFunction</code>&rdquo; or &ldquo;what's the inferred type of <code>x</code> on line 42?&rdquo; If the LSP tool fires, you have working go-to-definition, references, and hover.</p></div>
+</section>
+<section id="setup-py" aria-labelledby="py-h">
+<h2 class="section" id="py-h">6. Python setup</h2>
+<p>The official Anthropic-maintained marketplace plugin <code>pyright-lsp</code> wires up Pyright. Pyright is published on both npm and PyPI; pick the install method that matches your environment.</p>
+<ol class="steps">
+<li>Install the server. Three options, in order of recommendation:
+<ul>
+<li><strong>pipx (recommended for CLI tools)</strong>: <code>pipx install pyright</code></li>
+<li><strong>npm</strong>: <code>npm install -g pyright</code></li>
+<li><strong>pip</strong>: <code>pip install pyright</code></li>
+</ul>
+</li>
+<li>Install the marketplace plugin:<br><code>/plugin install pyright-lsp@claude-plugins-official</code></li>
+<li>Verify the binary on PATH:<br><code>which pyright-langserver</code></li>
+<li>Reload plugin discovery:<br><code>/reload-plugins</code></li>
+</ol>
+<h3>Resulting configuration</h3>
+<p>Reproduced verbatim from <code>marketplace.json</code>:</p>
+<pre><code>"lspServers": {
+  "pyright": {
+    "command": "pyright-langserver",
+    "args": ["--stdio"],
+    "extensionToLanguage": {
+      ".py": "python",
+      ".pyi": "python"
+    }
+  }
+}</code></pre>
+<p class="muted">Source: <code>~/.claude/plugins/marketplaces/claude-plugins-official/.claude-plugin/marketplace.json</code>, lines 2653&ndash;2674.</p>
+<div class="callout"><span class="label">pipx vs pip</span><p><code>pipx install pyright</code> keeps the binary isolated in its own venv, which avoids surprise version drift if another Python tool wants a different Pyright. <code>pip install --user pyright</code> is the next-best fallback on systems without pipx.</p></div>
+</section>
+<section id="daily" aria-labelledby="daily-h">
+<h2 class="section" id="daily-h">7. Daily use</h2>
+<p>Once a server is registered and reloaded, day-to-day interaction is three commands plus a small number of natural-language prompts.</p>
+<h3>Slash commands you will actually use</h3>
+<ul>
+<li><code>/plugin</code> &mdash; opens the panel: <strong>Discover</strong> (browse marketplace), <strong>Installed</strong> (toggle / disable), <strong>Errors</strong> (validation issues for installed plugins).</li>
+<li><code>/reload-plugins</code> &mdash; refreshes the plugin registry after any change to <code>.lsp.json</code>, <code>plugin.json</code>, or installed binaries.</li>
+<li>Diagnostics arrive automatically after edits; Claude Code surfaces them via a <em>Found N new diagnostic issues&hellip;</em> notice. Pressing <kbd>Ctrl</kbd>+<kbd>O</kbd> expands that notice for details &mdash; it does not trigger diagnostics. Toggle the auto-injection off per-server with <code>"diagnostics": false</code> in that server's block (navigation still works).</li>
+</ul>
+<h3>Interaction workflow</h3>
+<div class="prompts" aria-label="Example prompts">
+<h3>Prompts to type into Claude Code</h3>
+<ul>
+<li>&ldquo;Find every reference to <code>build_payload</code> in this repo.&rdquo;</li>
+<li>&ldquo;Inspect the inferred type of <code>cfg.timeout</code> on line 38.&rdquo;</li>
+<li>&ldquo;List the workspace symbols matching <code>parse*</code>.&rdquo;</li>
+<li>&ldquo;Where is <code>TokenError</code> implemented? Show call hierarchy.&rdquo;</li>
+<li>&ldquo;The diagnostics on lines 12&ndash;17 are wrong; fix them without changing the public API.&rdquo;</li>
+<li>&ldquo;Go to the definition of <code>format_iso</code>.&rdquo;</li>
+</ul>
+</div>
+<h3>The diagnostics trade-off</h3>
+<p>Auto-injected diagnostics consume tokens. On a long session with a noisy language server, this can be a meaningful slice of your context budget. Two clean levers:</p>
+<ul>
+<li><strong>Disable per-server</strong>: set <code>"diagnostics": false</code> in that server's block. Navigation still works; only the auto-injection is off.</li>
+<li><strong>Filter at the server</strong>: configure severities via <code>settings</code> (e.g. drop <code>information</code> and <code>hint</code> for Pyright) so less data crosses the wire in the first place.</li>
+</ul>
+</section>
+<section id="zero" aria-labelledby="zero-h">
+<h2 class="section" id="zero-h">8. What &ldquo;0 plugin LSP servers&rdquo; means</h2>
+<p>The message <em>0 plugin LSP servers</em> is informational, not an error. It is the count of LSP server definitions accepted from your active plugins right now. Specifically:</p>
+<ul>
+<li><strong>Active plugins only</strong>. Disabled, broken, or unparseable plugins do not count, even if their <code>lspServers</code> block is well-formed.</li>
+<li><strong>Definitions, not languages</strong>. One plugin can register multiple servers under one <code>lspServers</code> object; the count is definitions, not languages.</li>
+<li><strong>Definitions, not necessarily running processes</strong>. A server is only spawned when a matching file is opened. Until then, the count is the catalog size.</li>
+<li><strong>Not built-in tool count</strong>. Claude Code's LSP tool always exists; this number is unrelated to it.</li>
+</ul>
+<h3>Expected non-zero checklist</h3>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Symptom</th><th>Likely cause</th><th>First check</th></tr></thead>
+<tbody>
+<tr><td>Count stays 0 after install</td><td>Plugin disabled in <code>/plugin</code> &rarr; Installed</td><td>Re-enable, then <code>/reload-plugins</code></td></tr>
+<tr><td>Count stays 0 after reload</td><td><code>plugin.json</code> or <code>.lsp.json</code> failed validation</td><td><code>/plugin</code> &rarr; Errors tab</td></tr>
+<tr><td>Count drops after a session restart</td><td>Plugin source changed (e.g. marketplace refresh)</td><td>Reinstall; confirm marketplace <code>sha</code></td></tr>
+<tr><td>Count nonzero but no features</td><td>No matching file opened yet</td><td>Open a <code>.ts</code> / <code>.py</code> and retry</td></tr>
+</tbody>
+</table>
+</div>
+<div class="callout"><span class="label">Current dev-harness-kit status</span><p>The local dev-harness-kit plugin currently ships no LSP definition, so <em>0 plugin LSP servers</em> is the expected baseline. Adding <code>lspServers</code> to either <code>.lsp.json</code> or inline in <code>plugin.json</code> is what changes the count.</p></div>
+</section>
+<section id="troubleshoot" aria-labelledby="tr-h">
+<h2 class="section" id="tr-h">9. Troubleshooting runbook</h2>
+<p>Work down this matrix from the cheapest signal to the deepest. Most &ldquo;LSP doesn't work&rdquo; reports are 1&ndash;2 rows in.</p>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Symptom</th><th>Likely cause</th><th>Fix</th></tr></thead>
+<tbody>
+<tr><td>Server fails to start, log says &ldquo;command not found&rdquo;</td><td>Binary not on Claude Code's PATH</td><td>Use absolute path in <code>command</code>; verify with <code>claude --debug</code></td></tr>
+<tr><td><code>/plugin</code> &rarr; Errors tab shows validation failure</td><td><code>plugin.json</code> or <code>.lsp.json</code> invalid</td><td>Run <code>claude plugin validate ./my-plugin</code>; fix quoted fields</td></tr>
+<tr><td>Plugin installed but never appears in <code>/plugin</code></td><td>Plugin disabled, or marketplace refresh pending</td><td>Re-enable in Installed; then <code>/reload-plugins</code></td></tr>
+<tr><td>Wrong server picks up a file</td><td><code>.lsp.json</code> placed in wrong root (sub-project instead of plugin root)</td><td>Move <code>.lsp.json</code> next to <code>.claude-plugin/plugin.json</code></td></tr>
+<tr><td>Two plugins claim <code>.py</code>; only one works</td><td>Extension collision; first registered wins + warning</td><td>Disable the loser or change one plugin's <code>extensionToLanguage</code></td></tr>
+<tr><td>Server sees wrong project root in monorepo</td><td>Default workspace folder is the repo root</td><td>Set <code>workspaceFolder</code> per package</td></tr>
+<tr><td>Init hangs and times out</td><td>Server expects large index step during <code>initialized</code></td><td>Raise <code>startupTimeout</code>; check <code>initializationOptions</code></td></tr>
+<tr><td>Server crashes and stays down</td><td>Crash loop exceeding <code>maxRestarts</code> or auto-restart off</td><td>Enable <code>restartOnCrash</code> (v2.1.205+) and inspect <code>--debug</code> logs</td></tr>
+<tr><td>Memory climbs over a long session</td><td>Server holds full project index in memory</td><td>Close unused workspaces; pick a lighter server variant</td></tr>
+<tr><td>Stale &ldquo;0 plugin LSP servers&rdquo; after install</td><td>Cached plugin catalog, marketplace <code>sha</code> mismatch</td><td><code>/reload-plugins</code>; reinstall the plugin; restart Claude Code</td></tr>
+</tbody>
+</table>
+</div>
+<h3>Diagnostic incantations</h3>
+<ul>
+<li><code>claude --debug</code> &mdash; prints plugin load, plugin validation, and server startup / skip events. Use it to see whether a server definition was accepted, why it was skipped, or why the binary failed to launch.</li>
+<li><code>claude plugin validate ./my-plugin</code> &mdash; validates <code>plugin.json</code> + <code>.lsp.json</code> from the CLI.</li>
+<li><code>/plugin validate ./my-plugin</code> &mdash; same check, in-session.</li>
+<li><code>/reload-plugins</code> &mdash; restart the plugin registry; cheap and idempotent.</li>
+</ul>
+</section>
+<section id="security" aria-labelledby="sec-h">
+<h2 class="section" id="sec-h">10. Security &amp; performance</h2>
+<div class="cards">
+<article class="card-grid"><span class="tag">Trust</span><h3>Process origin</h3><p>A plugin's <code>command</code> launches a real local process under your user. Anything that process can do, you can do. Audit before installing.</p></article>
+<article class="card-grid"><span class="tag">Env</span><h3>Environment exposure</h3><p>Server <code>env</code> is merged into the spawned process's environment. Avoid passing secrets. Use <code>initializationOptions</code> or <code>settings</code> for server-specific config.</p></article>
+<article class="card-grid"><span class="tag">Source</span><h3>Marketplace trust</h3><p>A marketplace is a list of plugin sources, identified by git URL + <code>sha</code>. Treat unknown marketplaces like unknown npm scopes. Pin where possible.</p></article>
+<article class="card-grid"><span class="tag">Footprint</span><h3>Memory</h3><p>Large servers (e.g. Pyright on a monorepo, typescript-language-server on hundreds of files) hold whole-project state. Closing files does not unload the index.</p></article>
+<article class="card-grid"><span class="tag">Tokens</span><h3>Diagnostic context</h3><p>Auto-injected diagnostics enter the model's context. A noisy server on a long session is a real token cost. <code>"diagnostics": false</code> or <code>settings</code>-level severity filters are the cleanest knobs.</p></article>
+<article class="card-grid"><span class="tag">Trade-off</span><h3>Disabling diagnostics</h3><p>Turning <code>diagnostics</code> off keeps navigation features intact; you only lose the auto-injection into model context. Useful for large repos or noisy rulesets.</p></article>
+</div>
+<div class="callout danger"><span class="label">Operational rule</span><p>Schema validity only proves the shape of a plugin manifest &mdash; it does not vouch for what the plugin does. Before enabling a plugin, review its source, the exact <code>command</code> and its arguments, and the trust placed in the marketplace <code>sha</code> and the binary that <code>command</code> resolves to. <code>claude plugin validate</code> confirms shape, not intent.</p></div>
+</section>
+<section id="sources" aria-labelledby="src-h">
+<h2 class="section" id="src-h">11. Sources</h2>
+<ul>
+<li><a href="https://microsoft.github.io/language-server-protocol/overviews/lsp/overview/">Official LSP overview (microsoft.github.io)</a> &mdash; the authoritative introduction to the protocol. For the actual wire-level specification (every request, response, and notification), follow the spec links from that page rather than treating the overview as normative.</li>
+<li><a href="https://code.claude.com/docs/en/discover-plugins">Discover Plugins &mdash; Claude Code docs</a></li>
+<li><a href="https://code.claude.com/docs/en/plugins-reference">Plugins Reference &mdash; Claude Code docs</a></li>
+</ul>
+<p class="muted">The marketplace listings <code>pyright-lsp</code> and <code>typescript-lsp</code> are local official examples; they are correct for the version pinned in the marketplace <code>sha</code> but not normative for the spec.</p>
+</section>
+</main>
+<footer class="site">
+<div class="inner">
+<h2>Source attribution</h2>
+<ul>
+<li><a href="https://microsoft.github.io/language-server-protocol/overviews/lsp/overview/">LSP overview</a> &mdash; Microsoft, normative.</li>
+<li><a href="https://code.claude.com/docs/en/discover-plugins">Claude Code: Discover Plugins</a> &mdash; Claude Code docs.</li>
+<li><a href="https://code.claude.com/docs/en/plugins-reference">Claude Code: Plugins Reference</a> &mdash; Claude Code docs.</li>
+<li>Local marketplace entries (verified, pinned by <code>sha</code>):
+<ul>
+<li><code>pyright-lsp</code> &mdash; <code>~/.claude/plugins/marketplaces/claude-plugins-official/.claude-plugin/marketplace.json</code>, lines 2653&ndash;2674.</li>
+<li><code>typescript-lsp</code> &mdash; same file, lines 3412&ndash;3439.</li>
+</ul>
+</li>
+</ul>
+<p class="src">Last reviewed against the marketplace pinned <code>sha</code> for <code>claude-plugins-official</code>. Regenerate after any plugin upgrade.</p>
+</div>
+</footer>
+</body>
+</html>
